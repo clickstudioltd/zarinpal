@@ -9,150 +9,170 @@ use Zarinpal\Clients\IClient;
 class Zarinpal
 {
     /**
-     * Zarinpal constructor.
-     * @param string $merchantID
-     * @param IClient $client
-     * @param string $lang
-     * @param bool $sandbox
-     * @param bool $zarinGate
-     * @param string $zarinGatePSP
-     * @param bool $laravel
+     * Merchant ID.
+     *
+     * @var string
      */
-    function __construct(
-        string $merchantID,
-        IClient $client,
-        string $lang,
-        bool $sandbox,
-        bool $zarinGate,
-        string $zarinGatePSP = '',
-        bool $laravel = false
-    ) {
-        $this->merchantID = $merchantID;
-        $this->client = $client;
-        $this->lang = $lang;
-        $this->sandbox = $sandbox;
-        $this->zarinGate = $zarinGate;
-        $this->zarinGatePSP = $zarinGatePSP;
-        $this->laravel = $laravel;
-        $this->zarinGatePSPList = ['Asan', 'Sep', 'Sad', 'Pec', 'Fan', 'Emz'];
-    }
-
     public string $merchantID;
+
+    /**
+     * REST Client.
+     *
+     * @var IClient
+     */
     public IClient $client;
-    public string $lang;
+
+    /**
+     * Sandbox environment.
+     *
+     * @var bool
+     */
     public bool $sandbox;
-    public bool $zarinGate;
-    public array $zarinGatePSPList;
-    public string $zarinGatePSP;
+
+    /**
+     * Zaringate portal.
+     *
+     * @var bool
+     */
+    public bool $zaringate;
+
+    /**
+     * Zaringate Psp.
+     *
+     * @var string
+     */
+    public string $zaringatePsp;
+
+    /**
+     * Messages language (en|fa).
+     *
+     * @var string
+     */
+    public string $lang;
+
+    /**
+     * Laravel environment.
+     *
+     * @var bool
+     */
     public bool $laravel;
 
     /**
-     * Request for new payment
-     * to get "Authority" if no error occur.
+     * Zarinpal constructor.
+     *
+     * @param  string  $merchantID
+     * @param  IClient  $client
+     * @param  bool  $sandbox
+     * @param  bool  $zaringate
+     * @param  string  $zaringatePsp
+     * @param  string  $lang
+     * @param  bool  $laravel
+     */
+    public function __construct(string $merchantID, IClient $client, bool $sandbox = false, bool $zaringate = false, string $zaringatePsp = '', string $lang = 'fa', bool $laravel = true) {
+        $this->merchantID = $merchantID;
+        $this->client = $client;
+        $this->sandbox = $sandbox;
+        $this->zaringate = $zaringate;
+        $this->zaringatePsp = $zaringatePsp;
+        $this->lang = $lang;
+        $this->laravel = $laravel;
+    }
+
+    /**
+     * Request for new payment to get "Authority" if no error occurs.
+     *
+     * @param  int  $amount
+     * @param  string  $description
+     * @param  string  $callbackUrl
      *
      * @see http://bit.ly/3sVkMU9
-     *
-     * @param array $payload
-     *
      * @throws RequestException
      * @return array
      */
-    function request(array $payload)
+    public function request($amount, $description, $callbackUrl)
     {
-        return $this->client->sendRequest('request', array_merge([
-            'merchant_id' => $this->merchantID
-        ], $payload));
+        $response = $this->client->sendRequest($this->sandbox ? 'PaymentRequest' : 'request', $this->sandbox ? [
+            'MerchantID' => $this->merchantID,
+            'Amount' => $amount,
+            'Description' => $description,
+            'CallbackURL' => $callbackUrl,
+        ] : [
+            'merchant_id' => $this->merchantID,
+            'amount' => $amount,
+            'description' => $description,
+            'callback_url' => $callbackUrl,
+        ]);
+
+        return $this->sandbox ? [
+            'code' => $response['Status'] ?? null,
+            'authority' => $response['Authority'] ?? '',
+        ] : [
+            'code' => $response['data']['code'] ?? null,
+            'authority' => $response['data']['authority'] ?? '',
+        ];
     }
 
     /**
      * Verify payment success.
      *
+     * @param  string  $authority
+     * @param  int  $amount
+     *
      * @see http://bit.ly/3a75K54
-     *
-     * @param array $payload
-     *
      * @throws RequestException
      * @return array
      */
-    function verify(array $payload)
+    public function verify($authority, $amount)
     {
-        return $this->client->sendRequest('verify', array_merge([
-            'merchant_id' => $this->merchantID
-        ], $payload));
-    }
-
-    /**
-     * Get unverified transactions.
-     *
-     * @see http://bit.ly/3qP3MNB
-     *
-     * @throws RequestException
-     * @return array
-     */
-    function unVerified()
-    {
-        return $this->client->sendRequest('unVerified', [
-            'merchant_id' => $this->merchantID
+        $response = $this->client->sendRequest($this->sandbox ? 'PaymentVerification' : 'verify', $this->sandbox ? [
+            'MerchantID' => $this->merchantID,
+            'Authority' => $authority,
+            'Amount' => $amount,
+        ] : [
+            'merchant_id' => $this->merchantID,
+            'authority' => $authority,
+            'amount' => $amount,
         ]);
+
+        return $this->sandbox ? [
+            'code' => $response['Status'] ?? null,
+            'ref_id' => $response['RefID'] ?? '',
+        ] : [
+            'code' => $response['data']['code'] ?? null,
+            'ref_id' => $response['data']['ref_id'] ?? '',
+        ];
     }
 
     /**
-     * Refund to user.
-     *
-     * @see http://bit.ly/3qNEkb2
-     *
-     * @param string $accessToken
-     * @param array $payload
-     *
-     * @throws RequestException
-     * @return array
-     */
-    function refund(string $accessToken, array $payload)
-    {
-        return $this->client->sendRequest('unVerified', array_merge([
-            'merchant_id' => $this->merchantID
-        ], $payload), [
-            'authorization' => "Bearer ${accessToken}"
-        ]);
-    }
-
-    /**
-     * Get message of (status) code
-     *
-     * @see http://bit.ly/2M5Ltoz
+     * Get message of status code.
      *
      * @param int $code
      *
+     * @see http://bit.ly/2M5Ltoz
      * @return string
      */
-    function getCodeMessage(int $code)
+    public function getCodeMessage(int $code)
     {
         return Message::get($this->lang, $code);
     }
 
     /**
-     * Get generated redirect url
-     *
-     * @see http://bit.ly/2MsIOF7
+     * Get generated redirect url.
      *
      * @param string $authority
      *
+     * @see http://bit.ly/2MsIOF7
      * @return string
      */
-    function getRedirectUrl(string $authority)
+    public function getRedirectUrl(string $authority)
     {
-        $subDomain = ($this->sandbox) ? 'sandbox' : 'www';
-        $zarinGateURL = ($this->zarinGate) ? '/ZarinGate' : '';
+        $zaringateUrl = ($this->zaringate) ? '/ZarinGate' : '';
 
-        if(
-            $this->zarinGate &&
-            trim($this->zarinGatePSP) !== '' &&
-            in_array($this->zarinGatePSP, $this->zarinGatePSPList)
-        ) {
-            $zarinGateURL = '/' . $this->zarinGatePSP;
+        if ($this->zaringate && trim($this->zaringatePsp) !== '' && in_array($this->zaringatePsp, ['Asan', 'Sep', 'Sad', 'Pec', 'Fan', 'Emz'])) {
+            $zaringateUrl = '/' . $this->zaringatePsp;
         }
 
-        return 'https://' . $subDomain . '.zarinpal.com/pg/StartPay/' . $authority . $zarinGateURL;
+        return 'https://' . ($this->sandbox ? 'sandbox' : 'www') . '.zarinpal.com/pg/StartPay/' . $authority . $zaringateUrl;
     }
 
     /**
@@ -162,12 +182,14 @@ class Zarinpal
      *
      * @return mixed
      */
-    function redirect(string $authority)
+    public function redirect(string $authority)
     {
         $url = $this->getRedirectUrl($authority);
+
         if ($this->laravel) {
             return redirect($url);
         }
+
         header('Location: ' . $url);
         exit;
     }

@@ -9,8 +9,9 @@ class GuzzleClient implements IClient
 {
     function __construct($sandbox)
     {
-        $sub = ($sandbox) ? 'sandbox' : 'api';
-        $this->baseUrl = 'https://' . $sub . '.zarinpal.com/pg/v4/payment/';
+        $this->baseUrl = $sandbox
+            ? 'https://sandbox.zarinpal.com/pg/rest/WebGate/'
+            : 'https://api.zarinpal.com/pg/v4/payment/';
     }
 
     public string $baseUrl;
@@ -31,7 +32,8 @@ class GuzzleClient implements IClient
         $client = new Client([
             'base_uri' => $this->baseUrl
         ]);
-        $response = $client->request('POST', "${method}.json", [
+
+        $response = $client->request('POST', "$method.json", [
             'headers' => array_merge([
                 'user-agent' => 'ZarinPal Rest Api v4',
                 'cache-control' => 'no-cache',
@@ -40,7 +42,9 @@ class GuzzleClient implements IClient
             ], $headers),
             'json' => $payload
         ]);
+
         $response = $response->getBody()->getContents();
+
         return json_decode($response, true);
     }
 }
