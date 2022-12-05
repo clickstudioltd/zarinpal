@@ -81,27 +81,15 @@ class Zarinpal
     /**
      * Request for new payment to get "Authority" if no error occurs.
      *
-     * @param  int  $amount
-     * @param  string  $description
-     * @param  string  $callbackUrl
+     * @param  array  $payload
      *
      * @see http://bit.ly/3sVkMU9
      * @throws RequestException
      * @return array
      */
-    public function request($amount, $description, $callbackUrl)
+    public function request(array $payload)
     {
-        $response = $this->client->sendRequest($this->sandbox ? 'PaymentRequest' : 'request', $this->sandbox ? [
-            'MerchantID' => $this->merchantID,
-            'Amount' => $amount,
-            'Description' => $description,
-            'CallbackURL' => $callbackUrl,
-        ] : [
-            'merchant_id' => $this->merchantID,
-            'amount' => $amount,
-            'description' => $description,
-            'callback_url' => $callbackUrl,
-        ]);
+        $response = $this->client->sendRequest($this->sandbox ? 'PaymentRequest' : 'request', $this->makePayload($payload));
 
         return $this->sandbox ? [
             'code' => $response['Status'] ?? null,
@@ -115,24 +103,15 @@ class Zarinpal
     /**
      * Verify payment success.
      *
-     * @param  string  $authority
-     * @param  int  $amount
+     * @param  array  $payload
      *
      * @see http://bit.ly/3a75K54
      * @throws RequestException
      * @return array
      */
-    public function verify($authority, $amount)
+    public function verify(array $payload)
     {
-        $response = $this->client->sendRequest($this->sandbox ? 'PaymentVerification' : 'verify', $this->sandbox ? [
-            'MerchantID' => $this->merchantID,
-            'Authority' => $authority,
-            'Amount' => $amount,
-        ] : [
-            'merchant_id' => $this->merchantID,
-            'authority' => $authority,
-            'amount' => $amount,
-        ]);
+        $response = $this->client->sendRequest($this->sandbox ? 'PaymentVerification' : 'verify', $this->makePayload($payload));
 
         return $this->sandbox ? [
             'code' => $response['Status'] ?? null,
@@ -192,5 +171,21 @@ class Zarinpal
 
         header('Location: ' . $url);
         exit;
+    }
+
+    /**
+     * Make payment request payload.
+     *
+     * @param  array  $payload
+     *
+     * @return array
+     */
+    private function makePayload(array $payload)
+    {
+        return array_merge($payload, $this->sandbox ? [
+            'MerchantID' => $this->merchantID
+        ] : [
+            'merchant_id' => $this->merchantID
+        ]);
     }
 }
